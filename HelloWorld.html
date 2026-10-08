@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello World</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f4f6f8;
+      color: #333;
+    }
+
+    .card {
+      background: #fff;
+      padding: 2rem 3rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="greeting"></h1>
+  </div>
+
+  <script>
+    /**
+     * Classe simples que gera e exibe uma saudação na página.
+     */
+    class HelloWorld {
+      /**
+       * @param {string} [name="Mundo"] - nome usado na saudação
+       * @param {HTMLElement} [target] - elemento onde a saudação será exibida
+       */
+      constructor(name = "Mundo", target = null) {
+        this.name = name;
+        this.target = target;
+      }
+
+      /** Retorna a mensagem de saudação. */
+      greet() {
+        return `Hello, ${this.name}!`;
+      }
+
+      /** Exibe a saudação no elemento alvo (se fornecido). */
+      render() {
+        if (this.target) {
+          this.target.textContent = this.greet();
+        }
+        return this;
+      }
+    }
+
+    // Uso: cria a instância e renderiza a saudação no <h1>.
+    const app = new HelloWorld("Mundo", document.getElementById("greeting"));
+    app.render();
+  </script>
+</body>
+</html>
