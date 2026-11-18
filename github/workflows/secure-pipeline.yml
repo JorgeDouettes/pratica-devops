@@ -1,0 +1,93 @@
+name: Secure Pipeline CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Nó 1: SAST (análise estática do código-fonte)
+  # ─────────────────────────────────────────────
+  sast:
+    name: SAST - Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Rodar Semgrep (gera relatório)
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/javascript \
+            --json --output semgrep-report.json || true
+
+      - name: Publicar relatório SAST
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-sast-semgrep
+          path: semgrep-report.json
+
+      # Validação: quebra a pipeline se o Semgrep encontrar vulnerabilidades
+      - name: Validação SAST (falha se houver achados)
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/javascript \
+            --error
+
+  # ─────────────────────────────────────────────
+  # Nó 2: DAST (ataque à aplicação rodando)
+  # ─────────────────────────────────────────────
+  dast:
+    name: DAST - OWASP ZAP
+    runs-on: ubuntu-latest
+    needs: sast   # só roda se o SAST passar
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Subir a aplicação (servidor HTTP na porta 8080)
+        run: |
+          nohup python3 -m http.server 8080 > server.log 2>&1 &
+          sleep 3
+
+      # Validação: confirma que a aplicação está no ar antes do scan
+      - name: Validar que a aplicação respondeu (HTTP 200)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/index.html)
+          echo "Status HTTP: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Aplicação não está respondendo"; exit 1
+          fi
+
+      - name: Preparar pasta de relatórios
+        run: |
+          mkdir -p zap-reports
+          chmod 777 zap-reports
+
+      # Validação: ZAP Baseline falha a pipeline se houver alertas de nível FAIL
+      # (-I = avisos WARN não quebram, só aparecem no relatório)
+      - name: Rodar OWASP ZAP Baseline Scan
+        run: |
+          docker run --rm --network host \
+            -v ${{ github.workspace }}/zap-reports:/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://localhost:8080/index.html \
+              -r zap-report.html \
+              -J zap-report.json \
+              -I
+
+      - name: Publicar relatório DAST
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-dast-zap
+          path: zap-reports/
